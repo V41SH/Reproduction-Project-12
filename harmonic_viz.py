@@ -42,3 +42,7 @@ for i, j in enumerate(js):
 
 plt.tight_layout()
 plt.show()
+
+# save_path = "circular_harmonics.png"
+# fig.savefig(save_path, dpi=300)
+# print(f"Figure saved to {save_path}")

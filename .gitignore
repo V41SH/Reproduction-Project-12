@@ -1,2 +1,5 @@
 isbi-datasets-master/
 .idea/
+*.pdf
+*.pyc
+mnist_rot/
