@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Grid parameters
 grid_size = 9
 half = grid_size // 2
 x = np.linspace(-half, half, grid_size)
@@ -21,24 +20,37 @@ def circular_harmonic(j, k, R, Phi):
     angular = np.exp(1j * k * Phi)
     return radial * angular
 
-
 js = [3, 2, 1, 0]
 ks = [0, 1, 2, 3, 4]
 
-fig, axes = plt.subplots(len(js), len(ks) * 2, figsize=(12, 6))
+fig, axes = plt.subplots(len(js), len(ks)*2, figsize=(12,6))
+
 for i, j in enumerate(js):
     for l, k in enumerate(ks):
-        psi = circular_harmonic(j, k, R, Phi)
-        real = np.real(psi)
-        imag = np.imag(psi)
+        if j == 0 and k != 0:
+            axes[i, 2*l    ].axis('off')
+            axes[i, 2*l + 1].axis('off')
+            continue
 
-        axes[i, 2 * l].imshow(real, cmap='gray')
-        axes[i, 2 * l].set_title(f"Re j={j}, k={k}")
-        axes[i, 2 * l].axis('off')
+        psi        = circular_harmonic(j, k, R, Phi)
+        real       = np.real(psi)
+        imag_inv   = np.imag(np.conj(psi))    
+        real_mapped = (real     + 1.0) / 2.0  
+        imag_mapped = (imag_inv + 1.0) / 2.0
 
-        axes[i, 2 * l + 1].imshow(imag, cmap='gray')
-        axes[i, 2 * l + 1].set_title(f"Im j={j}, k={k}")
-        axes[i, 2 * l + 1].axis('off')
+        ax_r = axes[i, 2*l]
+        ax_i = axes[i, 2*l + 1]
+
+        ax_r.imshow(real_mapped, cmap='gray', vmin=0, vmax=1)
+        ax_r.set_title(f"Re j={j}, k={k}")
+        ax_r.axis('off')
+
+        if k != 0:
+            ax_i.imshow(imag_mapped, cmap='gray', vmin=0, vmax=1)
+            ax_i.set_title(f"Im j={j}, k={k}")
+            ax_i.axis('off')
+        else:
+            ax_i.axis('off')
 
 plt.tight_layout()
 plt.show()
