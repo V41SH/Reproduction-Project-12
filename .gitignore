@@ -3,3 +3,4 @@ isbi-datasets-master/
 *.pdf
 *.pyc
 mnist_rot/
+**/.DS_Store
