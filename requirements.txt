@@ -3,7 +3,7 @@ certifi==2025.4.26
 charset-normalizer==3.4.2
 Cython==3.1.1
 e2cnn==0.2.3
-escnn==1.0.11
+# escnn==1.0.11
 filelock==3.18.0
 fsspec==2025.3.2
 idna==3.10
