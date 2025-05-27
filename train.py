@@ -122,7 +122,7 @@ def main():
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            torch.save(model.state_dict(), f"outputs/{timestamp}/best_model.pth")
+            torch.save(model.state_dict(), f"outputs/{timestamp}/{args.num_orientations}best_model.pth")
             print("Saved new best model!")
 
     print(f"\nTraining complete! Best validation accuracy: {best_val_acc:.2f}%")
