@@ -5,10 +5,22 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import argparse
 import os
+import math
 from datetime import datetime
+from e2cnn import nn as enn
 
 from mnist_rot.data_loader_mnist_rot import build_mnist_rot_loader
 from models.sfcnn import SFCNN
+import torch.nn.init as init
+
+def apply_standard_he_init(model):
+    for m in model.modules():
+        if isinstance(m, enn.R2Conv):
+            # m.weights is a 1D tensor of shape (num_basis,)
+            std = math.sqrt(2.0 / m.in_type.size)  # fan_in = number of input fields
+            with torch.no_grad():
+                m.weights.data.normal_(0, std)
+
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
@@ -57,7 +69,8 @@ def main():
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=40)
     parser.add_argument('--lr', type=float, default=0.015)
-    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'mps')
+    parser.add_argument('--init', type=str, default='coeff')
     args = parser.parse_args()
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -66,7 +79,14 @@ def main():
     train_loader, _, _ = build_mnist_rot_loader('train', args.batch_size)
     val_loader, _, _ = build_mnist_rot_loader('valid', args.batch_size)
 
-    model = SFCNN(num_orientations=args.num_orientations).to(args.device)
+    if args.init == 'coeff':
+        model = SFCNN(args.num_orientations).to(args.device)
+    elif args.init == 'he':
+        model = SFCNN(num_orientations=args.num_orientations).to(args.device)
+        apply_standard_he_init(model)
+    elif args.init == 'no':
+        model = SFCNN(init=False, num_orientations=args.num_orientations).to(args.device)
+
     criterion = nn.CrossEntropyLoss()
 
     # Split conv and fc params for different weight decays
