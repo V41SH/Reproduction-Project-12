@@ -4,3 +4,4 @@ isbi-datasets-master/
 *.pyc
 mnist_rot/
 **/.DS_Store
+outputs/

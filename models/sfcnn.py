@@ -4,65 +4,86 @@ from e2cnn import gspaces
 from e2cnn import nn as enn
 
 class SFCNN(nn.Module):
-    def __init__(self, num_orientations=8):
+    def __init__(self, num_orientations=16):
         super().__init__()
-        
-        # The symmetry group is N rotations (discrete cyclic group)
+
         self.r2_act = gspaces.Rot2dOnR2(N=num_orientations)
-        
-        # Input layer
+
+        # Input layer: 24 channels, 9x9
         in_type = enn.FieldType(self.r2_act, [self.r2_act.trivial_repr])
         self.input_type = in_type
-        
-        # Layer 1: 24 channels, 9x9 kernel
         out_type = enn.FieldType(self.r2_act, 24*[self.r2_act.regular_repr])
         self.block1 = enn.SequentialModule(
             enn.R2Conv(in_type, out_type, kernel_size=9, padding=4),
             enn.InnerBatchNorm(out_type),
-            enn.ReLU(out_type),
-            enn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
+            enn.ReLU(out_type)
         )
-        
-        # Layer 2: 32 channels, 7x7 kernel
+
+        # Layer 2: 32 channels, 7x7
         in_type = out_type
         out_type = enn.FieldType(self.r2_act, 32*[self.r2_act.regular_repr])
         self.block2 = enn.SequentialModule(
             enn.R2Conv(in_type, out_type, kernel_size=7, padding=3),
             enn.InnerBatchNorm(out_type),
-            enn.ReLU(out_type),
-            enn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
+            enn.ReLU(out_type)
         )
-        
-        # Layer 3: 64 channels, 5x5 kernel
+
+        # Spatial max pooling 2x2
+        self.pool1 = enn.PointwiseMaxPool(out_type, kernel_size=2, stride=2)
+
+        # Layer 3 & 4: 36 channels, 7x7
         in_type = out_type
-        out_type = enn.FieldType(self.r2_act, 64*[self.r2_act.regular_repr])
+        out_type = enn.FieldType(self.r2_act, 36*[self.r2_act.regular_repr])
         self.block3 = enn.SequentialModule(
-            enn.R2Conv(in_type, out_type, kernel_size=5, padding=2),
+            enn.R2Conv(in_type, out_type, kernel_size=7, padding=3),
+            enn.InnerBatchNorm(out_type),
+            enn.ReLU(out_type),
+            enn.R2Conv(out_type, out_type, kernel_size=7, padding=3),
             enn.InnerBatchNorm(out_type),
             enn.ReLU(out_type)
         )
-        
-        # Final pooling and FC layers
-        self.pool_final = enn.GroupPooling(out_type)
-        self.fc = nn.Sequential(
-            nn.Linear(64*7*7, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, 10)
+
+        # Spatial max pooling 2x2
+        self.pool2 = enn.PointwiseMaxPool(out_type, kernel_size=2, stride=2)
+
+        # Layer 5 & 6: 64 and 96 channels
+        in_type = out_type
+        mid_type = enn.FieldType(self.r2_act, 64*[self.r2_act.regular_repr])
+        out_type = enn.FieldType(self.r2_act, 96*[self.r2_act.regular_repr])
+        self.block4 = enn.SequentialModule(
+            enn.R2Conv(in_type, mid_type, kernel_size=7, padding=3),
+            enn.InnerBatchNorm(mid_type),
+            enn.ReLU(mid_type),
+            enn.R2Conv(mid_type, out_type, kernel_size=5, padding=2),
+            enn.InnerBatchNorm(out_type),
+            enn.ReLU(out_type)
         )
-    
+
+        # Global spatial pooling
+        self.gpool = enn.PointwiseAdaptiveAvgPool(out_type, output_size=1)
+
+        # Global orientation pooling
+        self.opool = enn.GroupPooling(out_type)
+
+        # Fully connected layers: 96 -> 96 -> 10
+        self.fc = nn.Sequential(
+            nn.Linear(96, 96),
+            nn.ReLU(),
+            nn.Linear(96, 96),
+            nn.ReLU(),
+            nn.Linear(96, 10)
+        )
+
     def forward(self, x):
-        # Convert input to geometric tensor
         x = enn.GeometricTensor(x, self.input_type)
-        
-        # Forward through blocks
         x = self.block1(x)
         x = self.block2(x)
+        x = self.pool1(x)
         x = self.block3(x)
-        
-        # Final pooling and classification
-        x = self.pool_final(x).tensor
+        x = self.pool2(x)
+        x = self.block4(x)
+        x = self.gpool(x)
+        x = self.opool(x).tensor
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
