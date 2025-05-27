@@ -3,9 +3,10 @@ import torch.nn as nn
 from e2cnn import gspaces
 from e2cnn import nn as enn
 
-class ResidualBlock(nn.Module):
+class ResidualBlock(enn.EquivariantModule):
     def __init__(self, r2_act, in_type):
         super().__init__()
+        self.in_type = in_type
         self.out_type = in_type
         self.block = enn.SequentialModule(
             enn.R2Conv(in_type, in_type, kernel_size=7, padding=3),
@@ -15,6 +16,30 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         return x + self.block(x)
+
+    def evaluate_output_type(self, input_type):
+        return self.out_type
+
+    def evaluate_output_shape(self, input_shape):
+        return input_shape
+
+class PointwiseUpsample(enn.EquivariantModule):
+    def __init__(self, in_type, scale_factor):
+        super().__init__()
+        self.in_type = in_type
+        self.out_type = in_type
+        self.scale_factor = scale_factor
+
+    def forward(self, x):
+        x.tensor = F.interpolate(x.tensor, scale_factor=self.scale_factor, mode='nearest')
+        return x
+
+    def evaluate_output_type(self, input_type):
+        return self.out_type
+
+    def evaluate_output_shape(self, input_shape):
+        N, C, H, W = input_shape
+        return (N, C, H * self.scale_factor, W * self.scale_factor)
 
 class MembraneNet(nn.Module):
     def __init__(self):
@@ -49,11 +74,11 @@ class MembraneNet(nn.Module):
         self.enc3, feat_96 = enc_block(feat_48, 96)
 
         # Decoder
-        self.up1 = enn.PointwiseUpsampling(feat_96, 2)
+        self.up1 = PointwiseUpsample(feat_96, 2)
         self.dec1, _ = enc_block(feat_96, 48)
-        self.up2 = enn.PointwiseUpsampling(feat_48, 2)
+        self.up2 = PointwiseUpsample(feat_48, 2)
         self.dec2, _ = enc_block(feat_48, 24)
-        self.up3 = enn.PointwiseUpsampling(feat_24, 2)
+        self.up3 = PointwiseUpsample(feat_24, 2)
         self.dec3, _ = enc_block(feat_24, 12)
 
         self.orientation_pool = enn.GroupPooling(feat_12)

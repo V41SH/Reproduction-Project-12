@@ -4,8 +4,10 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from membrane_net import MembraneNet
-from your_em_dataset import ISBIDataset  # You need to define this Dataset class
+from models.memnet import MembraneNet
+from ISBI.dataloader import ISBIDataset
+import random
+from torchvision.transforms import functional as TF
 
 
 def elastic_net_loss(model, l1=1e-7, l2=1e-8):
@@ -17,6 +19,10 @@ def elastic_net_loss(model, l1=1e-7, l2=1e-8):
             l2_reg = l2_reg + torch.norm(param, 2)**2
     return l1 * l1_reg + l2 * l2_reg
 
+class RandomRotation90:
+    def __call__(self, x):
+        angle = random.choice([0, 90, 180, 270])
+        return TF.rotate(x, angle)
 
 def train_epoch(model, loader, optimizer, device):
     model.train()
@@ -39,11 +45,11 @@ def main():
     transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.RandomRotation([0, 90, 180, 270]),
+        RandomRotation90(),
         transforms.ToTensor()
     ])
 
-    train_dataset = ISBIDataset("/path/to/data", transform=transform)
+    train_dataset = ISBIDataset("ISBI/train-volume.tif", transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
 
     model = MembraneNet().to(device)
