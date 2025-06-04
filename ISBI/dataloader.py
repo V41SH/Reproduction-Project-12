@@ -1,11 +1,8 @@
-import torch
 from torch.utils.data import Dataset
-import torchvision.transforms.functional as TF
 import numpy as np
 from PIL import Image
 import tifffile
 import random
-import os
 
 class ISBIDataset(Dataset):
     def __init__(self, volume_path, label_path=None, patch_size=256, pad=32, transform=None):
@@ -22,7 +19,7 @@ class ISBIDataset(Dataset):
 
     def __getitem__(self, idx):
         slice_img = self.volume[idx]
-        slice_img = np.pad(slice_img, self.pad, mode='reflect')
+        slice_img = np.pad(slice_img, self.pad, mode='reflect') # reflect padding
 
         image = Image.fromarray(slice_img.astype(np.uint8))
 

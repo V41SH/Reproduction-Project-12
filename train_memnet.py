@@ -50,14 +50,17 @@ def main():
     ])
 
     train_dataset = ISBIDataset("ISBI/train-volume.tif", transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=4)
 
     model = MembraneNet().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.05)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.85)
 
-    epochs = 100
+    epochs = 50
     for epoch in range(epochs):
+        if epoch == 0:
+            print("Begun training")
+
         loss = train_epoch(model, train_loader, optimizer, device)
         print(f"Epoch {epoch + 1}: Loss = {loss:.4f}")
         scheduler.step()
