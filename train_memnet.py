@@ -4,11 +4,12 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from models.memnet import MembraneNet
-from ISBI.dataloader import ISBIDataset
+from tqdm import tqdm
 import random
 from torchvision.transforms import functional as TF
 
+from models.memnet import MembraneNet
+from ISBI.dataloader import ISBIDataset
 
 def elastic_net_loss(model, l1=1e-7, l2=1e-8):
     l1_reg = torch.tensor(0., requires_grad=True).to(next(model.parameters()).device)
@@ -31,7 +32,8 @@ def train_epoch(model, loader, optimizer, device):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
-        output = output[..., 32:-32, 32:-32]  # Crop back to 256x256
+        output = output[..., 16:-16, 16:-16]
+        target = target[..., 16:-16, 16:-16]
         loss = F.binary_cross_entropy(output, target) + elastic_net_loss(model)
         loss.backward()
         optimizer.step()
@@ -49,20 +51,24 @@ def main():
         transforms.ToTensor()
     ])
 
-    train_dataset = ISBIDataset("ISBI/train-volume.tif", transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=4)
+    train_dataset = ISBIDataset("ISBI/train-volume.tif", "ISBI/train-labels.tif", patch_size=256, pad=32, transform=transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
 
     model = MembraneNet().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.05)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.85)
 
-    epochs = 50
-    for epoch in range(epochs):
-        if epoch == 0:
-            print("Begun training")
-
+    epochs = 100
+    for epoch in tqdm(range(epochs)):
+    # for epoch in range(epochs):
+        print(f"\nStarting epoch {epoch + 1}")
         loss = train_epoch(model, train_loader, optimizer, device)
         print(f"Epoch {epoch + 1}: Loss = {loss:.4f}")
+
+        print(f"Memory allocated: {torch.cuda.memory_allocated() / 1e6:.1f} MB")
+        print(f"Memory reserved: {torch.cuda.memory_reserved() / 1e6:.1f} MB")
+
         scheduler.step()
 
         if (epoch + 1) % 10 == 0:

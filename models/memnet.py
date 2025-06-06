@@ -49,29 +49,32 @@ class PointwiseUpsample(enn.EquivariantModule):
 class MembraneNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.r2_act = gspaces.Rot2dOnR2(N=17) # 17 orientations
+        self.r2_act = gspaces.Rot2dOnR2(N=4) # 17 orientations
+        self.dropout_prob = 0.4  # As specified in paper for ISBI experiment
 
-        # Encoder
+        # Encoder blocks with dropout
         def enc_block(in_repr, out_channels):
             out_repr = enn.FieldType(self.r2_act, out_channels * [self.r2_act.regular_repr])
             block = enn.SequentialModule(
                 enn.R2Conv(in_repr, out_repr, kernel_size=7, padding=3),
                 enn.InnerBatchNorm(out_repr),
                 enn.ReLU(out_repr),
+                enn.FieldDropout(out_repr, p=self.dropout_prob),  # Dropout after each block
                 ResidualBlock(self.r2_act, out_repr)
             )
             return block, out_repr
 
-        # Input
+        # Input layer with dropout
         in_type = enn.FieldType(self.r2_act, [self.r2_act.trivial_repr])
-        feat_12 = enn.FieldType(self.r2_act, 12 * [self.r2_act.regular_repr]) #12 channels
+        feat_12 = enn.FieldType(self.r2_act, 12 * [self.r2_act.regular_repr])
         self.input_layer = enn.SequentialModule(
             enn.R2Conv(in_type, feat_12, kernel_size=11, padding=5),
             enn.InnerBatchNorm(feat_12),
-            enn.ReLU(feat_12)
+            enn.ReLU(feat_12),
+            enn.FieldDropout(feat_12, p=self.dropout_prob)  # Dropout after input
         )
 
-        # Down blocks
+        # Down blocks - each will have dropout from enc_block
         self.enc1, feat_24 = enc_block(feat_12, 24)
         self.pool1 = enn.PointwiseMaxPool(feat_24, 2, 2)
         self.enc2, feat_48 = enc_block(feat_24, 48)
@@ -82,26 +85,35 @@ class MembraneNet(nn.Module):
         self.pool4 = enn.PointwiseMaxPool(feat_48_3, 2, 2)
         self.enc5, feat_48_4 = enc_block(feat_48_3, 48)
 
-        # Decoder
+        # Decoder blocks - add dropout to each decoder block too
+        def dec_block(in_repr, out_channels):
+            out_repr = enn.FieldType(self.r2_act, out_channels * [self.r2_act.regular_repr])
+            return enn.SequentialModule(
+                enn.R2Conv(in_repr, out_repr, kernel_size=7, padding=3),
+                enn.InnerBatchNorm(out_repr),
+                enn.ReLU(out_repr),
+                enn.FieldDropout(out_repr, p=self.dropout_prob)  # Dropout in decoder
+            ), out_repr
+
         self.up1 = PointwiseUpsample(feat_48_4, 2)
-        self.dec1, _ = enc_block(feat_48_4, 48)
+        self.dec1, _ = dec_block(feat_48_4, 48)
         self.up2 = PointwiseUpsample(feat_48_3, 2)
-        self.dec2, _ = enc_block(feat_48_3, 48)
+        self.dec2, _ = dec_block(feat_48_3, 48)
         self.up3 = PointwiseUpsample(feat_48_2, 2)
-        self.dec3, _ = enc_block(feat_48_2, 24)
+        self.dec3, _ = dec_block(feat_48_2, 24)
         self.up4 = PointwiseUpsample(feat_24, 2)
-        self.dec4, _ = enc_block(feat_24, 12)
+        self.dec4, _ = dec_block(feat_24, 12)
 
         self.orientation_pool = enn.GroupPooling(feat_12)
 
-        # Final 1x1 conv
+        # Final 1x1 convs with regular dropout
         self.final = nn.Sequential(
             nn.Conv2d(12, 12, kernel_size=1),
             nn.ReLU(),
+            nn.Dropout2d(p=self.dropout_prob),  # Regular dropout for conventional layers
             nn.Conv2d(12, 1, kernel_size=1),
             nn.Sigmoid()
         )
-
     def forward(self, x):
         x = enn.GeometricTensor(x, enn.FieldType(self.r2_act, [self.r2_act.trivial_repr]))
         x0 = self.input_layer(x)

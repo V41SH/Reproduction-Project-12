@@ -5,7 +5,7 @@ import tifffile
 import random
 
 class ISBIDataset(Dataset):
-    def __init__(self, volume_path, label_path=None, patch_size=256, pad=32, transform=None):
+    def __init__(self, volume_path, label_path=None, patch_size=128, pad=16, transform=None):
         self.volume = tifffile.imread(volume_path)
         self.label = tifffile.imread(label_path) if label_path is not None else None
         self.patch_size = patch_size
@@ -26,7 +26,7 @@ class ISBIDataset(Dataset):
         if self.label is not None:
             slice_label = self.label[idx]
             slice_label = np.pad(slice_label, self.pad, mode='reflect')
-            label = Image.fromarray((slice_label > 0).astype(np.float32))  # binarize
+            label = Image.fromarray((slice_label > 0).astype(np.uint8)) 
         else:
             label = Image.new('F', (image.width, image.height))
 
