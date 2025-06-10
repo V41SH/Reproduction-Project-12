@@ -109,7 +109,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = MembraneNet().to(device)
-    model.load_state_dict(torch.load("membrane_net_epoch40.pth", map_location=device), strict=False)
+    model.load_state_dict(torch.load("ISBI_models/membrane_net_epoch40.pth", map_location=device), strict=False)
 
     # Path to your test image
     image_path = "/home/salonisaxena/work/Q4/FUNML/Reproduction-Project-12/isbi-datasets-master/data/images/train-volume29.jpg"  # Can also point to a .png or .jpg if available
