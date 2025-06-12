@@ -49,7 +49,7 @@ class PointwiseUpsample(enn.EquivariantModule):
 class MembraneNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.r2_act = gspaces.Rot2dOnR2(N=4) # 17 orientations
+        self.r2_act = gspaces.Rot2dOnR2(N=17) # 17 orientations
         self.dropout_prob = 0.4  # As specified in paper for ISBI experiment
 
         # Encoder blocks with dropout
