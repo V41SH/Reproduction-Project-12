@@ -69,7 +69,14 @@ import torch
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.ndimage import label
+from skimage.io import imread
 import os
+
+def boundary_to_segmentation(binary_boundary):
+    inverted_boundary = 1 - binary_boundary  # regions = 1, boundaries = 0
+    segmentation, _ = label(inverted_boundary)
+    return segmentation
 
 def visualize_from_image_path(model, image_path, device, save_path="predictions/prediction_single.png"):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -82,13 +89,13 @@ def visualize_from_image_path(model, image_path, device, save_path="predictions/
     # Run inference
     model.eval()
     with torch.no_grad():
-        output = model(image_tensor)[..., 16:-16, 16:-16].squeeze().cpu().numpy()
+        output = model(image_tensor)[..., 32:-32, 32:-32].squeeze().cpu().numpy()
         img = image_tensor.squeeze().cpu().numpy()
 
         # Normalize and process
         output_norm = (output - output.min()) / (output.max() - output.min())
         inverted = 1.0 - output_norm
-        binary_mask = (inverted > 0.6).astype(float)
+        binary_mask = (inverted > 0.5).astype(float)
         binary_mask = 1 - binary_mask
 
         # Plot
@@ -105,19 +112,59 @@ def visualize_from_image_path(model, image_path, device, save_path="predictions/
         plt.savefig(save_path)
         plt.close()
 
+    return binary_mask
+
+from skimage.metrics import adapted_rand_error
+from sklearn.metrics import mutual_info_score
+from scipy.stats import entropy
+
+def compute_vrand(pred_segmentation, gt_segmentation):
+    error, precision, recall = adapted_rand_error(gt_segmentation, pred_segmentation)
+    f_score = 2 * precision * recall / (precision + recall + 1e-8)
+    return f_score, precision, recall
+
+
+def compute_vinfo(pred_segmentation, gt_segmentation):
+    flat_pred = pred_segmentation.ravel()
+    flat_gt = gt_segmentation.ravel()
+
+    mi = mutual_info_score(flat_pred, flat_gt)
+    h_pred = entropy(np.bincount(flat_pred))
+    h_gt = entropy(np.bincount(flat_gt))
+
+    split = mi / (h_pred + 1e-8)
+    merge = mi / (h_gt + 1e-8)
+    f_score = 2 * split * merge / (split + merge + 1e-8)
+
+    return f_score, split, merge
+
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    device = "cpu"
     model = MembraneNet().to(device)
-    model.load_state_dict(torch.load("ISBI_models/membrane_net_epoch40.pth", map_location=device), strict=False)
+    model.load_state_dict(torch.load("membrane_net_epoch50.pth", map_location=device), strict=False)
 
-    # Path to your test image
-    image_path = "/home/salonisaxena/work/Q4/FUNML/Reproduction-Project-12/isbi-datasets-master/data/images/train-volume29.jpg"  # Can also point to a .png or .jpg if available
+    # Image and label paths (both .jpg now)
+    image_path = "/home/salonisaxena/work/Q4/FUNML/Reproduction-Project-12/isbi-datasets-master/data/images/train-volume29.jpg"
+    label_path = "/home/salonisaxena/work/Q4/FUNML/Reproduction-Project-12/isbi-datasets-master/data/labels/train-labels29.jpg"
 
-    visualize_from_image_path(model, image_path, device)
+    binary_mask = visualize_from_image_path(model, image_path, device)
+    pred_seg = boundary_to_segmentation(binary_mask)
+
+    # Load ground truth label image and ensure grayscale + same crop
+    label_img = Image.open(label_path).convert("L")
+    label_np = np.array(label_img)[32:-32, 32:-32]  # Match prediction crop
+    gt_seg = label_np.astype(np.int32)
+
+    # Compute metrics
+    vrand_f, vrand_split, vrand_merge = compute_vrand(pred_seg, gt_seg)
+    vinfo_f, vinfo_split, vinfo_merge = compute_vinfo(pred_seg, gt_seg)
+
+    print(f"VRand F-score: {vrand_f:.4f}, Split: {vrand_split:.4f}, Merge: {vrand_merge:.4f}")
+    print(f"VInfo F-score: {vinfo_f:.4f}, Split: {vinfo_split:.4f}, Merge: {vinfo_merge:.4f}")
 
 # def main():
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     device = "cpu" 
+#     # torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #     transform = transforms.Compose([
 #         transforms.ToTensor()
@@ -127,7 +174,7 @@ def main():
 #     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 #     model = MembraneNet().to(device)
-#     model.load_state_dict(torch.load("membrane_net_epoch100.pth", map_location=device), strict=False)
+#     model.load_state_dict(torch.load("membrane_net_epoch10.pth", map_location=device), strict=False)
 
 
 
