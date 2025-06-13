@@ -34,7 +34,7 @@ if __name__ == '__main__':
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     model = SFCNN(num_orientations=16)
-    model.load_state_dict(torch.load("sfcnn_checkpoint.pth", map_location=device))
+    model.load_state_dict(torch.load("MNIST_models/750/4best_model.pth", map_location=device))
     model.to(device)
 
     test(model, device, test_loader)

@@ -2,6 +2,8 @@ isbi-datasets-master/
 .idea/
 *.pdf
 *.pyc
+MNIST_models
+data
 mnist_rot/
 **/.DS_Store
 outputs/
