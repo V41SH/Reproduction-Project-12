@@ -32,8 +32,8 @@ def train_epoch(model, loader, optimizer, device):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
-        output = output[..., 16:-16, 16:-16]
-        target = target[..., 16:-16, 16:-16]
+        output = output[..., 32:-32, 32:-32]
+        target = target[..., 32:-32, 32:-32]
         loss = F.binary_cross_entropy(output, target) + elastic_net_loss(model)
         loss.backward()
         optimizer.step()

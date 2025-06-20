@@ -5,7 +5,7 @@ import tifffile
 import random
 
 class ISBIDataset(Dataset):
-    def __init__(self, volume_path, label_path=None, patch_size=128, pad=16, transform=None):
+    def __init__(self, volume_path, label_path=None, patch_size=256, pad=32, transform=None):
         self.volume = tifffile.imread(volume_path)
         self.label = tifffile.imread(label_path) if label_path is not None else None
         self.patch_size = patch_size

@@ -4,8 +4,8 @@ from torch.utils.data import DataLoader
 from dataloader import ISBIDataset
 
 def main():
-    volume_path = 'ISBI/train-volume.tif'  # Update this with your actual path
-    label_path = 'ISBI/train-labels.tif'   # Update this with your actual path
+    volume_path = 'ISBI/train-volume.tif'
+    label_path = 'ISBI/train-labels.tif'
 
     # Define a basic transform if needed
     transform = transforms.Compose([

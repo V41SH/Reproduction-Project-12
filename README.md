@@ -25,6 +25,7 @@ models/cnn.py
 train_memnet.py
 eval_memnet.py
 models/memnet.py
+ISBI/*
 ```
 
 * Z2CNN baseline from "Group Equivariant Convolutional Networks"
